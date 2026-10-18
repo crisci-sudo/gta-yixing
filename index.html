@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>义兴都市 · GTA-Yixing</title>
+<style>
+  :root {
+    --accent: #ffab2e;
+    --accent-soft: rgba(255, 171, 46, .18);
+    --panel: rgba(12, 14, 18, .62);
+    --ink: #eef1f5;
+    --danger: #ff4d4d;
+    --ok: #52e0a0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #05070a; }
+  body {
+    font-family: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    color: var(--ink);
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #scene { position: fixed; inset: 0; display: block; }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .25s; }
+  #hud.live { opacity: 1; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid rgba(255, 255, 255, .09);
+    border-radius: 10px;
+    backdrop-filter: blur(7px);
+  }
+
+  /* top-right status */
+  #status { position: absolute; top: 16px; right: 16px; padding: 10px 14px; text-align: right; min-width: 190px; }
+  #money { font-size: 26px; font-weight: 700; color: var(--ok); letter-spacing: .5px; font-variant-numeric: tabular-nums; }
+  #stars { margin-top: 4px; font-size: 19px; letter-spacing: 3px; color: rgba(255, 255, 255, .18); }
+  #stars b { color: var(--accent); font-weight: 400; }
+  #heat { margin-top: 6px; font-size: 11px; color: rgba(238, 241, 245, .55); }
+
+  /* minimap */
+  #mapwrap { position: absolute; left: 16px; bottom: 16px; width: 208px; height: 208px; }
+  #minimap { width: 208px; height: 208px; border-radius: 50%; display: block; }
+  #mapring { position: absolute; inset: 0; border: 2px solid rgba(255, 255, 255, .16); border-radius: 50%; }
+  #compass { position: absolute; left: 50%; top: -9px; transform: translateX(-50%); font-size: 10px; padding: 1px 7px; background: var(--panel); border-radius: 6px; color: var(--accent); }
+
+  /* speedo */
+  #dash { position: absolute; right: 16px; bottom: 16px; padding: 12px 16px; width: 216px; }
+  #speedo { font-size: 40px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  #speedo span { font-size: 13px; font-weight: 400; color: rgba(238, 241, 245, .5); margin-left: 5px; }
+  #gear { position: absolute; right: 16px; top: 12px; font-size: 15px; font-weight: 700; color: var(--accent); }
+  .bar { height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .12); margin-top: 7px; overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 3px; transition: width .12s linear; }
+  #bodybar i { background: var(--ok); }
+  #dmgbar i { background: var(--accent); }
+  #drift { margin-top: 7px; font-size: 11px; height: 13px; color: var(--accent); opacity: 0; }
+  #label { font-size: 11px; color: rgba(238, 241, 245, .5); margin-top: 2px; }
+
+  /* objective */
+  #objective { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); padding: 9px 18px; max-width: 62vw; text-align: center; opacity: 0; transition: opacity .2s; }
+  #objective.show { opacity: 1; }
+  #objtext { font-size: 15px; font-weight: 600; }
+  #objbar { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .14); margin-top: 7px; overflow: hidden; }
+  #objbar i { display: block; height: 100%; background: var(--accent); width: 100%; }
+
+  /* toast */
+  #toast { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); font-size: 40px; font-weight: 800; letter-spacing: 2px; text-shadow: 0 4px 22px rgba(0,0,0,.85); opacity: 0; transition: opacity .3s, transform .3s; white-space: nowrap; }
+  #toast.show { opacity: 1; }
+  #toast.bad { color: var(--danger); }
+  #toast.good { color: var(--ok); }
+
+  /* prompts + help */
+  #prompt { position: absolute; bottom: 25%; left: 50%; transform: translateX(-50%); padding: 6px 14px; font-size: 14px; opacity: 0; transition: opacity .15s; }
+  #prompt.show { opacity: 1; }
+  kbd { background: rgba(255, 255, 255, .14); border-radius: 4px; padding: 1px 6px; font-family: inherit; font-size: 12px; }
+  #help { position: absolute; left: 16px; top: 16px; padding: 12px 16px; font-size: 12.5px; line-height: 1.85; opacity: 0; transition: opacity .2s; }
+  #help.show { opacity: 1; }
+  #help h4 { margin: 0 0 6px; font-size: 12px; color: var(--accent); letter-spacing: 1px; }
+  #help div { display: flex; gap: 10px; }
+  #help div span { color: rgba(238, 241, 245, .72); }
+
+  /* overlays */
+  .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; background: radial-gradient(120% 100% at 50% 0%, rgba(20, 26, 38, .96), rgba(4, 5, 8, .98)); text-align: center; padding: 24px; }
+  .overlay h1 { margin: 0; font-size: 54px; letter-spacing: 6px; font-weight: 800; }
+  .overlay h1 em { font-style: normal; color: var(--accent); }
+  .overlay p { margin: 0; max-width: 620px; line-height: 1.75; color: rgba(238, 241, 245, .72); font-size: 14px; }
+  .overlay .keys { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap: 8px 18px; font-size: 13px; color: rgba(238, 241, 245, .78); }
+  .overlay .keys div { display: flex; justify-content: space-between; gap: 12px; }
+  button {
+    pointer-events: auto; cursor: pointer; font: inherit; font-size: 16px; font-weight: 700;
+    letter-spacing: 2px; color: #14100a; background: var(--accent); border: 0; border-radius: 9px; padding: 13px 40px;
+    transition: transform .12s, box-shadow .12s;
+  }
+  button:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(255, 171, 46, .32); }
+  #pause { display: none; }
+  #pause.on { display: flex; }
+  #boot .spin { width: 26px; height: 26px; border: 3px solid rgba(255, 171, 46, .25); border-top-color: var(--accent); border-radius: 50%; animation: sp 1s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  #fatal { display: none; text-align: left; }
+  #fatal pre { max-width: 88vw; overflow: auto; background: rgba(0, 0, 0, .55); padding: 14px; border-radius: 8px; font-size: 12px; color: #ffb0b0; pointer-events: auto; }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div id="hud">
+  <div id="status" class="panel">
+    <div id="money">$0</div>
+    <div id="stars">★★★★★</div>
+    <div id="heat"></div>
+  </div>
+
+  <div id="mapwrap" class="panel">
+    <canvas id="minimap" width="416" height="416"></canvas>
+    <div id="mapring"></div>
+    <div id="compass">N</div>
+  </div>
+
+  <div id="dash" class="panel">
+    <div id="speedo">0<span>km/h</span></div>
+    <div id="gear">P</div>
+    <div class="bar" id="bodybar"><i style="width:100%"></i></div>
+    <div class="bar" id="dmgbar"><i style="width:0%"></i></div>
+    <div id="label">—</div>
+    <div id="drift">漂移！</div>
+  </div>
+
+  <div id="objective" class="panel">
+    <div id="objtext"></div>
+    <div id="objbar"><i></i></div>
+  </div>
+
+  <div id="prompt" class="panel"></div>
+  <div id="toast"></div>
+
+  <div id="help" class="panel">
+    <h4>操作</h4>
+    <div><kbd>W / S</kbd><span>油门 · 刹车倒车</span></div>
+    <div><kbd>A / D</kbd><span>转向</span></div>
+    <div><kbd>空格</kbd><span>手刹漂移</span></div>
+    <div><kbd>Shift</kbd><span>奔跑 / 加速</span></div>
+    <div><kbd>F</kbd><span>上下车辆</span></div>
+    <div><kbd>E</kbd><span>任务点交互</span></div>
+    <div><kbd>鼠标</kbd><span>拖动转视角</span></div>
+    <div><kbd>H</kbd><span>收起本面板</span></div>
+    <div><kbd>Esc</kbd><span>暂停</span></div>
+  </div>
+</div>
+
+<div id="boot" class="overlay">
+  <div class="spin"></div>
+  <h1>义兴都市</h1>
+  <p id="bootmsg">正在生成城市…</p>
+</div>
+
+<div id="menu" class="overlay" style="display:none">
+  <h1>义兴<em>都市</em></h1>
+  <p>一座程序生成的开放城市。偷车、送货、竞速、摆脱追缉 —— 或者只是在街头游荡。<br/>城市有眼：撞人、抢车、撞警车都会引来通缉。</p>
+  <div class="keys">
+    <div><kbd>W A S D</kbd><span>驾驶 / 行走</span></div>
+    <div><kbd>空格</kbd><span>手刹漂移</span></div>
+    <div><kbd>Shift</kbd><span>奔跑 · 加速</span></div>
+    <div><kbd>F</kbd><span>上下车辆</span></div>
+    <div><kbd>E</kbd><span>任务交互</span></div>
+    <div><kbd>鼠标拖动</kbd><span>转视角</span></div>
+    <div><kbd>H</kbd><span>操作面板</span></div>
+    <div><kbd>Esc</kbd><span>暂停</span></div>
+  </div>
+  <button id="start">进入义兴</button>
+</div>
+
+<div id="pause" class="overlay">
+  <h1>暂停</h1>
+  <p>Esc 继续。城市的一切已静止 —— 包括追上你的那些车。</p>
+  <button id="resume">继续</button>
+</div>
+
+<div id="fatal" class="overlay" style="display:none">
+  <h1>启动失败</h1>
+  <p id="fatalhint">请通过本地服务器打开本页（不能直接双击 index.html）。</p>
+  <pre id="fatalmsg"></pre>
+  <button onclick="location.reload()">重试</button>
+</div>
+
+<script>
+  // Surfaces module/CORS failures with actionable instructions instead of a black screen.
+  window.__broken = function (msg) {
+    var boot = document.getElementById('boot');
+    if (boot) boot.style.display = 'none';
+    var f = document.getElementById('fatal');
+    var isFile = location.protocol === 'file:';
+    document.getElementById('fatalhint').textContent = isFile
+      ? '浏览器禁止 file:// 加载 ES 模块。请在项目目录运行： node serve.js ，然后访问 http://127.0.0.1:5173/'
+      : '模块加载失败，请检查 vendor/three.module.js 是否完整，然后重启 node serve.js 。';
+    document.getElementById('fatalmsg').textContent = msg || 'unknown error';
+    f.style.display = 'flex';
+  };
+  window.addEventListener('error', function (e) {
+    if (e.target && e.target.tagName === 'SCRIPT') window.__broken('script/模块加载被拒绝: ' + (e.target.src || ''));
+  }, true);
+  setTimeout(function () {
+    if (!window.__started) window.__broken('30 秒内没有加载到游戏模块。');
+  }, 30000);
+</script>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+<script type="module" src="./src/main.js" onerror="__broken('无法加载 src/main.js')"></script>
+</body>
+</html>
